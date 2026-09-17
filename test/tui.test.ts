@@ -921,9 +921,9 @@ describe("color handling", () => {
       crit: "\x1b[1;38;2;243;139;168m✗ exhausted now\x1b[0m",
     },
     light: {
-      claude: "\x1b[1;38;2;254;100;11m",
+      claude: "\x1b[1;38;2;228;82;0m",
       ok: "\x1b[1;38;2;52;150;30m72%\x1b[0m",
-      warn: "\x1b[1;38;2;214;128;10mempty in 1h 0m\x1b[0m",
+      warn: "\x1b[1;38;2;188;108;0mempty in 1h 0m\x1b[0m",
       crit: "\x1b[1;38;2;200;8;50m✗ exhausted now\x1b[0m",
     },
   } as const;
@@ -994,7 +994,7 @@ describe("color handling", () => {
       ...options,
       theme: "light",
     });
-    // Mocha claude peach (250,179,135) -> 223; Latte peach (254,100,11) -> 202.
+    // Mocha claude peach (250,179,135) -> 223; Latte peach (228,82,0) -> 202.
     expect(dark).toContain("\x1b[1;38;5;223m");
     expect(dark).not.toContain("\x1b[1;38;5;202m");
     expect(light).toContain("\x1b[1;38;5;202m");
@@ -1015,7 +1015,7 @@ describe("color handling", () => {
   it("colors the light-theme hint line with the Latte dim tone", () => {
     expect(
       renderTuiHintLine("hint", { colorDepth: "truecolor", theme: "light" }),
-    ).toContain("\x1b[38;2;140;143;161m");
+    ).toContain("\x1b[38;2;124;127;147m");
   });
 
   it("detects the theme from COLORFGBG only when set to auto", () => {
@@ -1025,7 +1025,13 @@ describe("color handling", () => {
     expect(detectTuiTheme("auto", { COLORFGBG: "0;15" })).toBe("light");
     expect(detectTuiTheme("auto", { COLORFGBG: "0;7" })).toBe("light");
     expect(detectTuiTheme("auto", { COLORFGBG: "0;default;7" })).toBe("light");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;8" })).toBe("light");
+    expect(detectTuiTheme("auto", { COLORFGBG: "0;8" })).toBe("dark");
+    expect(detectTuiTheme("auto", { COLORFGBG: "0;9" })).toBe("light");
+    expect(detectTuiTheme("auto", { COLORFGBG: "0;15 " })).toBe("light");
+    expect(detectTuiTheme("auto", { COLORFGBG: "0;1;15" })).toBe("light");
+    expect(detectTuiTheme("auto", { COLORFGBG: "15;default" })).toBe("dark");
+    expect(detectTuiTheme("auto", { COLORFGBG: "15;231" })).toBe("dark");
+    expect(detectTuiTheme("auto", { COLORFGBG: "0;-1" })).toBe("dark");
     expect(detectTuiTheme("auto", { COLORFGBG: "15;0" })).toBe("dark");
     expect(detectTuiTheme("auto", { COLORFGBG: "7;6" })).toBe("dark");
     expect(detectTuiTheme("auto", { COLORFGBG: "0;16" })).toBe("dark");

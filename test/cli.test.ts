@@ -162,6 +162,16 @@ describe("CLI flag parsing", () => {
     expect(() => parseFlags(["--theme", "light"])).toThrow(
       "--theme is only supported with --tui",
     );
+    expect(() => parseFlags(["--tui", "--theme"])).toThrow(
+      "--theme requires light, dark, or auto",
+    );
+    expect(() => parseFlags(["--tui", "--theme="])).toThrow(
+      "--theme requires light, dark, or auto",
+    );
+    expect(
+      parseFlags(["--tui", "--theme", "light", "--theme=dark"]).theme,
+    ).toBe("dark");
+    expect(parseFlags(["--tui", "--", "--theme", "auto"]).theme).toBe("auto");
   });
 
   it("rejects live-only flags without --tui", () => {
@@ -944,6 +954,25 @@ describe("--tui theme selection", () => {
     expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
     process.env.COLORFGBG = "default;default";
     expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
+  });
+
+  it("treats a blank QUOTA_AXI_THEME as unset", async () => {
+    process.env.COLORFGBG = "0;15";
+    for (const blank of ["", "   "]) {
+      process.env.QUOTA_AXI_THEME = blank;
+      expect(await capture(tuiOnce)).toContain(LATTE_CODEX);
+    }
+    delete process.env.COLORFGBG;
+    process.env.QUOTA_AXI_THEME = "";
+    expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
+  });
+
+  it("applies the theme to a non-TTY frame when color is forced on", async () => {
+    // FORCE_COLOR=3 is set in beforeEach; stdout here is a capture sink, not a TTY.
+    expect(process.stdout.isTTY).not.toBe(true);
+    expect(await capture([...tuiOnce, "--theme", "light"])).toContain(
+      LATTE_CODEX,
+    );
   });
 
   it("rejects an invalid QUOTA_AXI_THEME as a usage error", async () => {

@@ -77,11 +77,15 @@ async function quotaTuiReport(
   options: ProviderOptions,
 ): Promise<string> {
   // Precedence: --theme, then QUOTA_AXI_THEME, then auto (COLORFGBG, else dark).
+  // A blank variable selects nothing, matching the project's env conventions.
+  // Resolved once here so a variable edited mid-session can never throw inside
+  // the live loop.
+  const envTheme = process.env.QUOTA_AXI_THEME?.trim();
   const themeSetting =
     flags.theme ??
-    (process.env.QUOTA_AXI_THEME === undefined
+    (envTheme === undefined || envTheme === ""
       ? "auto"
-      : parseThemeValue(process.env.QUOTA_AXI_THEME, "QUOTA_AXI_THEME"));
+      : parseThemeValue(envTheme, "QUOTA_AXI_THEME"));
   const terminal = (): {
     columns?: number;
     colorDepth: TuiColorDepth;
