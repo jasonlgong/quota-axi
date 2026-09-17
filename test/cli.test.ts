@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseFlags, parseModelsFlags } from "../src/args.js";
 import { main, normalizeArgv } from "../src/cli.js";
 import { authCommand, quotaCommand } from "../src/commands.js";
@@ -49,6 +49,9 @@ const originalDeepSeekApiKey = process.env.DEEPSEEK_API_KEY;
 const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 const originalPiCodingAgentDir = process.env.PI_CODING_AGENT_DIR;
 const originalMmxConfigDir = process.env.MMX_CONFIG_DIR;
+const originalTheme = process.env.QUOTA_AXI_THEME;
+const originalColorFgBg = process.env.COLORFGBG;
+const originalForceColor = process.env.FORCE_COLOR;
 let tempDir: string | undefined;
 
 afterEach(() => {
@@ -82,6 +85,9 @@ afterEach(() => {
   restoreEnvironment("OPENROUTER_API_KEY", originalOpenRouterApiKey);
   restoreEnvironment("PI_CODING_AGENT_DIR", originalPiCodingAgentDir);
   restoreEnvironment("MMX_CONFIG_DIR", originalMmxConfigDir);
+  restoreEnvironment("QUOTA_AXI_THEME", originalTheme);
+  restoreEnvironment("COLORFGBG", originalColorFgBg);
+  restoreEnvironment("FORCE_COLOR", originalForceColor);
   if (tempDir) rmSync(tempDir, { recursive: true, force: true });
   tempDir = undefined;
   process.exitCode = undefined;
@@ -258,6 +264,21 @@ describe("CLI flag parsing", () => {
     await expect(
       authCommand(["--all"], { binPath: "quota-axi" }),
     ).rejects.toThrow("--all is only supported with --tui");
+  });
+
+  it("parses --theme for the human report", () => {
+    expect(parseFlags(["--tui", "--theme", "light"]).theme).toBe("light");
+    expect(parseFlags(["--tui", "--theme=dark"]).theme).toBe("dark");
+    expect(parseFlags(["--tui", "--theme", "auto"]).theme).toBe("auto");
+    expect(parseFlags(["--tui"]).theme).toBeUndefined();
+    for (const value of ["", "Light", "solarized"]) {
+      expect(() => parseFlags(["--tui", "--theme", value])).toThrow(
+        "--theme requires light, dark, or auto",
+      );
+    }
+    expect(() => parseFlags(["--theme", "light"])).toThrow(
+      "--theme is only supported with --tui",
+    );
   });
 
   it("rejects live-only flags without --tui", () => {
@@ -1918,6 +1939,68 @@ describe("new provider public quota output", () => {
     } finally {
       delete process.env.WINDSURF_API_KEY;
     }
+  });
+});
+
+describe("--tui theme selection", () => {
+  const MOCHA_CODEX = "\x1b[1;38;2;148;226;213m";
+  const LATTE_CODEX = "\x1b[1;38;2;23;146;153m";
+  const tuiOnce = ["--tui", "--once", "--provider", "codex"];
+
+  beforeEach(() => {
+    useTempCache();
+    PROVIDERS.codex = providerWithQuota(freshCodexQuota());
+    process.env.FORCE_COLOR = "3";
+    delete process.env.QUOTA_AXI_THEME;
+    delete process.env.COLORFGBG;
+  });
+
+  it("renders Mocha by default with nothing set", async () => {
+    const output = await capture(tuiOnce);
+    expect(output).toContain(MOCHA_CODEX);
+    expect(output).not.toContain(LATTE_CODEX);
+  });
+
+  it("renders Latte for --theme light and Mocha for --theme dark", async () => {
+    expect(await capture([...tuiOnce, "--theme", "light"])).toContain(
+      LATTE_CODEX,
+    );
+    expect(await capture([...tuiOnce, "--theme", "dark"])).toContain(
+      MOCHA_CODEX,
+    );
+  });
+
+  it("honors QUOTA_AXI_THEME when the flag is absent", async () => {
+    process.env.QUOTA_AXI_THEME = "light";
+    expect(await capture(tuiOnce)).toContain(LATTE_CODEX);
+  });
+
+  it("lets --theme win over QUOTA_AXI_THEME", async () => {
+    process.env.QUOTA_AXI_THEME = "light";
+    expect(await capture([...tuiOnce, "--theme", "dark"])).toContain(
+      MOCHA_CODEX,
+    );
+  });
+
+  it("auto-detects a light background from COLORFGBG and falls back to dark", async () => {
+    process.env.COLORFGBG = "0;15";
+    expect(await capture(tuiOnce)).toContain(LATTE_CODEX);
+    expect(await capture([...tuiOnce, "--theme", "auto"])).toContain(
+      LATTE_CODEX,
+    );
+    process.env.COLORFGBG = "15;0";
+    expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
+    process.env.COLORFGBG = "default;default";
+    expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
+  });
+
+  it("rejects an invalid QUOTA_AXI_THEME as a usage error", async () => {
+    process.env.QUOTA_AXI_THEME = "sepia";
+    const output = await capture(tuiOnce);
+    expect(output).toContain("QUOTA_AXI_THEME requires light, dark, or auto");
+    expect(output).toContain("code: VALIDATION_ERROR");
+    expect(output).not.toContain("╭─");
+    expect(process.exitCode).toBe(2);
   });
 });
 
