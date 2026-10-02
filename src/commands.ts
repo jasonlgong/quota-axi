@@ -39,7 +39,6 @@ import {
 import { formatInterval, runLiveTui, type LiveTuiIo } from "./tui-live.js";
 import {
   detectTuiColorDepth,
-  detectTuiTheme,
   renderQuotaTui,
   renderTuiHintLine,
   type TuiColorDepth,
@@ -145,15 +144,15 @@ async function quotaTuiReport(
   // A human display preference, so it is read only on this path: TOON and
   // JSON never see it.
   const show = readTuiShowPreference();
-  // Precedence: --theme, then QUOTA_AXI_THEME, then auto (COLORFGBG, else dark).
+  // Precedence: --theme, then QUOTA_AXI_THEME, then dark.
   // A blank variable selects nothing, matching the project's env conventions.
   // Resolved once here so a variable edited mid-session can never throw inside
   // the live loop.
   const envTheme = process.env.QUOTA_AXI_THEME?.trim();
-  const themeSetting =
+  const theme =
     flags.theme ??
     (envTheme === undefined || envTheme === ""
-      ? "auto"
+      ? "dark"
       : parseThemeValue(envTheme, "QUOTA_AXI_THEME"));
   const terminal = (): {
     columns?: number;
@@ -164,7 +163,7 @@ async function quotaTuiReport(
       ? {}
       : { columns: process.stdout.columns }),
     colorDepth: detectTuiColorDepth(process.env, process.stdout.isTTY === true),
-    theme: detectTuiTheme(themeSetting, process.env),
+    theme,
   });
   // A provider named with --provider is always drawn in full; otherwise the
   // providers that are not set up fold into one line until `a` or --all.

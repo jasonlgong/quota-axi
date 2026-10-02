@@ -1,7 +1,7 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   detectTuiColorDepth,
-  detectTuiTheme,
   formatCountdown,
   renderQuotaTui,
   renderTuiHintLine,
@@ -1331,6 +1331,29 @@ describe("color handling", () => {
     },
   );
 
+  // Default frame bytes captured from main at 02396ae, before theme support.
+  it.each([
+    [
+      "none",
+      "c5a7c98a02940a76853b3867abe4dbc1d58805cfe03da7472a7013022471c48d",
+    ],
+    ["16", "f5b60c461ccfb6679ccfd343bca23fe45ea10cc838cbafaf25cfd943bf02dcff"],
+    ["256", "e667f782fbd6a88be9f688a59381caa21eef4e122a44f53dbbb51e8fd6833d4c"],
+    [
+      "truecolor",
+      "b41b477f9a2c191b2c484796e2ef5e165ef6bf66b20e3ce6791279a7e19b52b0",
+    ],
+  ] as const)(
+    "keeps the default %s frame byte-identical to main",
+    (colorDepth, digest) => {
+      const output = renderQuotaTui(fixtureResponse(), {
+        timeZone: "America/Los_Angeles",
+        colorDepth,
+      });
+      expect(createHash("sha256").update(output).digest("hex")).toBe(digest);
+    },
+  );
+
   it("defaults to the dark palette when no theme is given", () => {
     const options = {
       timeZone: "America/Los_Angeles",
@@ -1379,28 +1402,6 @@ describe("color handling", () => {
     expect(
       renderTuiHintLine("hint", { colorDepth: "truecolor", theme: "light" }),
     ).toContain("\x1b[38;2;124;127;147m");
-  });
-
-  it("detects the theme from COLORFGBG only when set to auto", () => {
-    expect(detectTuiTheme("light", { COLORFGBG: "15;0" })).toBe("light");
-    expect(detectTuiTheme("dark", { COLORFGBG: "0;15" })).toBe("dark");
-    expect(detectTuiTheme("auto", {})).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;15" })).toBe("light");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;7" })).toBe("light");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;default;7" })).toBe("light");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;8" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;9" })).toBe("light");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;15 " })).toBe("light");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;1;15" })).toBe("light");
-    expect(detectTuiTheme("auto", { COLORFGBG: "15;default" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "15;231" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;-1" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "15;0" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "7;6" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;16" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "0;default" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "15" })).toBe("dark");
-    expect(detectTuiTheme("auto", { COLORFGBG: "" })).toBe("dark");
   });
 
   it("detects color depth from the environment", () => {

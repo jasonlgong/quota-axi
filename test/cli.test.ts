@@ -269,26 +269,25 @@ describe("CLI flag parsing", () => {
   it("parses --theme for the human report", () => {
     expect(parseFlags(["--tui", "--theme", "light"]).theme).toBe("light");
     expect(parseFlags(["--tui", "--theme=dark"]).theme).toBe("dark");
-    expect(parseFlags(["--tui", "--theme", "auto"]).theme).toBe("auto");
     expect(parseFlags(["--tui"]).theme).toBeUndefined();
-    for (const value of ["", "Light", "solarized"]) {
+    for (const value of ["", "Light", "solarized", "auto"]) {
       expect(() => parseFlags(["--tui", "--theme", value])).toThrow(
-        "--theme requires light, dark, or auto",
+        "--theme requires light or dark",
       );
     }
     expect(() => parseFlags(["--theme", "light"])).toThrow(
       "--theme is only supported with --tui",
     );
     expect(() => parseFlags(["--tui", "--theme"])).toThrow(
-      "--theme requires light, dark, or auto",
+      "--theme requires light or dark",
     );
     expect(() => parseFlags(["--tui", "--theme="])).toThrow(
-      "--theme requires light, dark, or auto",
+      "--theme requires light or dark",
     );
     expect(
       parseFlags(["--tui", "--theme", "light", "--theme=dark"]).theme,
     ).toBe("dark");
-    expect(parseFlags(["--tui", "--", "--theme", "auto"]).theme).toBe("auto");
+    expect(parseFlags(["--tui", "--", "--theme", "light"]).theme).toBe("light");
   });
 
   it("rejects live-only flags without --tui", () => {
@@ -1963,12 +1962,15 @@ describe("--tui theme selection", () => {
     process.env.FORCE_COLOR = "3";
     delete process.env.QUOTA_AXI_THEME;
     delete process.env.COLORFGBG;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-22T12:00:00.000Z"));
   });
 
   it("renders Mocha by default with nothing set", async () => {
     const output = await capture(tuiOnce);
     expect(output).toContain(MOCHA_CODEX);
     expect(output).not.toContain(LATTE_CODEX);
+    expect(output).toBe(await capture([...tuiOnce, "--theme", "dark"]));
   });
 
   it("renders Latte for --theme light and Mocha for --theme dark", async () => {
@@ -1990,30 +1992,53 @@ describe("--tui theme selection", () => {
     expect(await capture([...tuiOnce, "--theme", "dark"])).toContain(
       MOCHA_CODEX,
     );
-  });
-
-  it("auto-detects a light background from COLORFGBG and falls back to dark", async () => {
-    process.env.COLORFGBG = "0;15";
-    expect(await capture(tuiOnce)).toContain(LATTE_CODEX);
-    expect(await capture([...tuiOnce, "--theme", "auto"])).toContain(
+    process.env.QUOTA_AXI_THEME = "invalid";
+    expect(await capture([...tuiOnce, "--theme", "light"])).toContain(
       LATTE_CODEX,
     );
-    process.env.COLORFGBG = "15;0";
-    expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
-    process.env.COLORFGBG = "default;default";
-    expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
+  });
+
+  it("rejects --theme auto as a usage error", async () => {
+    const output = await capture([...tuiOnce, "--theme", "auto"]);
+    expect(output).toContain("--theme requires light or dark");
+    expect(process.exitCode).toBe(2);
+  });
+
+  it("keeps the default frame dark when COLORFGBG reports a light background", async () => {
+    const defaultOutput = await capture(tuiOnce);
+    process.env.COLORFGBG = "0;15";
+    expect(await capture(tuiOnce)).toBe(defaultOutput);
+    expect(defaultOutput).toContain(MOCHA_CODEX);
+    expect(defaultOutput).not.toContain(LATTE_CODEX);
   });
 
   it("treats a blank QUOTA_AXI_THEME as unset", async () => {
     process.env.COLORFGBG = "0;15";
     for (const blank of ["", "   "]) {
       process.env.QUOTA_AXI_THEME = blank;
-      expect(await capture(tuiOnce)).toContain(LATTE_CODEX);
+      expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
     }
     delete process.env.COLORFGBG;
     process.env.QUOTA_AXI_THEME = "";
     expect(await capture(tuiOnce)).toContain(MOCHA_CODEX);
   });
+
+  it.each(["TOON", "JSON"] as const)(
+    "keeps %s output unchanged",
+    async (format) => {
+      const args = [
+        "--provider",
+        "codex",
+        ...(format === "JSON" ? ["--json"] : []),
+      ];
+      const output = await capture(args);
+      for (const theme of ["light", "auto", "invalid"]) {
+        process.env.QUOTA_AXI_THEME = theme;
+        expect(await capture(args)).toBe(output);
+        expect(process.exitCode).toBeUndefined();
+      }
+    },
+  );
 
   it("applies the theme to a non-TTY frame when color is forced on", async () => {
     // FORCE_COLOR=3 is set in beforeEach; stdout here is a capture sink, not a TTY.
@@ -2023,14 +2048,17 @@ describe("--tui theme selection", () => {
     );
   });
 
-  it("rejects an invalid QUOTA_AXI_THEME as a usage error", async () => {
-    process.env.QUOTA_AXI_THEME = "sepia";
-    const output = await capture(tuiOnce);
-    expect(output).toContain("QUOTA_AXI_THEME requires light, dark, or auto");
-    expect(output).toContain("code: VALIDATION_ERROR");
-    expect(output).not.toContain("╭─");
-    expect(process.exitCode).toBe(2);
-  });
+  it.each(["sepia", "auto"])(
+    "rejects QUOTA_AXI_THEME=%s as a usage error",
+    async (value) => {
+      process.env.QUOTA_AXI_THEME = value;
+      const output = await capture(tuiOnce);
+      expect(output).toContain("QUOTA_AXI_THEME requires light or dark");
+      expect(output).toContain("code: VALIDATION_ERROR");
+      expect(output).not.toContain("╭─");
+      expect(process.exitCode).toBe(2);
+    },
+  );
 });
 
 describe("default TOON decision blocks", () => {

@@ -31,14 +31,7 @@ export type TuiColorDepth = "none" | "16" | "256" | "truecolor";
 export type TuiShow = "remaining" | "used";
 /** A resolved palette: `dark` is Catppuccin Mocha, `light` is Catppuccin Latte. */
 export type TuiTheme = "dark" | "light";
-/** The operator's request: a fixed theme or `auto` detection. */
-export type TuiThemeSetting = TuiTheme | "auto";
-
-export const TUI_THEME_SETTINGS: readonly TuiThemeSetting[] = [
-  "light",
-  "dark",
-  "auto",
-];
+export const TUI_THEME_SETTINGS: readonly TuiTheme[] = ["light", "dark"];
 
 export type TuiOptions = {
   /** Raw terminal width; clamped to [80, 120], defaults to 100. */
@@ -192,28 +185,6 @@ const LATTE: Palette = {
 };
 
 const PALETTES: Record<TuiTheme, Palette> = { dark: MOCHA, light: LATTE };
-
-/**
- * Resolve the palette for a theme setting. `auto` reads `COLORFGBG`
- * (`fg;bg`, optionally `fg;x;bg`) with vim's heuristic: a background index of
- * 7 or 9-15 in the 16-color range means a light terminal, while 0-6 and 8
- * (bright black) stay dark. Absent, unparseable, or out-of-range values
- * (256-color indexes included) keep `dark`.
- * No OSC 11 query is made: that adds a terminal round-trip to every live frame.
- */
-export function detectTuiTheme(
-  setting: TuiThemeSetting,
-  env: Record<string, string | undefined>,
-): TuiTheme {
-  if (setting !== "auto") return setting;
-  const parts = (env.COLORFGBG ?? "").split(";");
-  if (parts.length < 2) return "dark";
-  const background = parts[parts.length - 1]?.trim() ?? "";
-  if (!/^\d{1,2}$/.test(background)) return "dark";
-  const index = Number(background);
-  if (index > 15 || index < 7 || index === 8) return "dark";
-  return "light";
-}
 
 /**
  * Resolve the color depth for the TUI report from the environment. Honors
