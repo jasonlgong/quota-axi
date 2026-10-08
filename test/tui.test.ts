@@ -1388,6 +1388,34 @@ describe("color handling", () => {
     expect(stripAnsi(dark)).toBe(stripAnsi(light));
   });
 
+  it.each([
+    ["commandcode", [52, 150, 30]],
+    ["minimax", [215, 70, 0]],
+    ["mimo", [4, 140, 190]],
+    ["deepseek", [40, 110, 220]],
+    ["openrouter", [136, 57, 239]],
+    ["elevenlabs", [190, 70, 165]],
+    ["devin", [20, 130, 160]],
+    ["muse", [90, 80, 210]],
+    ["higgsfield", [200, 80, 20]],
+  ] as const)("uses a Latte accent for %s", (provider, rgb) => {
+    const response: QuotaAxiResponse = {
+      ...fixtureResponse(),
+      providers: [{ ...claudeProvider(), provider, label: provider }],
+    };
+    const latte = renderQuotaTui(response, {
+      colorDepth: "truecolor",
+      theme: "light",
+    });
+    const mocha = renderQuotaTui(response, {
+      colorDepth: "truecolor",
+      theme: "dark",
+    });
+    const accent = `\x1b[1;38;2;${rgb.join(";")}m`;
+    expect(latte).toContain(accent);
+    expect(mocha).not.toContain(accent);
+  });
+
   it("keeps the 16-color path identical across themes", () => {
     const options = {
       timeZone: "America/Los_Angeles",
