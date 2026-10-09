@@ -4,6 +4,7 @@ import {
   parseFlags,
   parseModelsFlags,
   readMaxAgeEnv,
+  parseThemeValue,
   type QuotaFlags,
 } from "./args.js";
 import {
@@ -41,6 +42,7 @@ import {
   renderQuotaTui,
   renderTuiHintLine,
   type TuiColorDepth,
+  type TuiTheme,
 } from "./tui.js";
 import { scrollHint } from "./tui-viewport.js";
 import type {
@@ -142,11 +144,26 @@ async function quotaTuiReport(
   // A human display preference, so it is read only on this path: TOON and
   // JSON never see it.
   const show = readTuiShowPreference();
-  const terminal = (): { columns?: number; colorDepth: TuiColorDepth } => ({
+  // Precedence: --theme, then QUOTA_AXI_THEME, then dark.
+  // A blank variable selects nothing, matching the project's env conventions.
+  // Resolved once here so a variable edited mid-session can never throw inside
+  // the live loop.
+  const envTheme = process.env.QUOTA_AXI_THEME?.trim();
+  const theme =
+    flags.theme ??
+    (envTheme === undefined || envTheme === ""
+      ? "dark"
+      : parseThemeValue(envTheme, "QUOTA_AXI_THEME"));
+  const terminal = (): {
+    columns?: number;
+    colorDepth: TuiColorDepth;
+    theme: TuiTheme;
+  } => ({
     ...(process.stdout.columns === undefined
       ? {}
       : { columns: process.stdout.columns }),
     colorDepth: detectTuiColorDepth(process.env, process.stdout.isTTY === true),
+    theme,
   });
   // A provider named with --provider is always drawn in full; otherwise the
   // providers that are not set up fold into one line until `a` or --all.
