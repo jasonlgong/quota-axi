@@ -19,6 +19,8 @@ export function resolveSystemTuiTheme(
               "query",
               "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
               "/v",
+              // Windows Terminal and other apps follow the default app mode,
+              // rather than SystemUsesLightTheme used by the taskbar and Start.
               "AppsUseLightTheme",
             ],
           }
